@@ -1,0 +1,7 @@
+*.vcf.gz
+*.vcf
+*.gz
+*.fasta*
+*.haps
+*.dict
+slurm*.out
