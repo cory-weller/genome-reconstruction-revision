@@ -1,19 +1,24 @@
 #!/usr/bin/env bash
+#SBATCH -N 1
+#SBATCH --ntasks-per-node=1
+#SBATCH --mem 8G
+#SBATCH -t 0-0:02:00
+#SBATCH -p standard
+#SBATCH --account berglandlab
+
 
 # arguments
 # input reference FASTA
 # input haplotype map
 # input VCF
 
-# haplotypes_gzfile=${1}
-# individual_n=${2}
-# reference_fasta=${3}
-# haplotypes_map_file=${4}
-
-haplotypes_gzfile="../input_data/haplotypes.polarized.vcf.gz"
-individual_n="1"
-reference_fasta="../input_data/dgrp2.reference.fasta"
-haplotypes_map_file="../01_forward_simulator/hybrid_swarm_32_F5_1.haps"
+haplotypes_gzfile=${1}
+individual_n=${SLURM_ARRAY_TASK_ID}
+chromosome=${2}
+reference_fasta=${3}
+haplotypes_map_file=${4}
+readLength=${5}
+coverage=${6}
 
 # map to VCF
 
@@ -87,9 +92,8 @@ EOF
 
 
 
-
 # Set up associative array of lineID : column, to be used by TABIX
-vals=($(zgrep -m 1 "^CHROM" ${haplotypes_gzfile} | xargs | cut -f 10-))
+vals=($(zgrep -m 1 "^#CHROM" ${haplotypes_gzfile} | xargs | cut -f 10-))
 declare -A founderIndices
 
 for i in $(seq 0 "${#vals[@]}"); do
@@ -99,16 +103,101 @@ done
 
 # Read through diploid paths, extracting genotypes with TABIX, appending to estimate.vcf file
 # Here is where you would change the bgzipped vcf filename to whatever one has all the sites you're trying to pull out based on the path
-while read chromosome start stop par1 par2; do
+while read chromosomeN start stop par1 par2; do
+    if [[ $chromosomeN == $chromosome ]]; then
     col1=${founderIndices[[$par1]]}
     col2=${founderIndices[[$par2]]}
-    tabix $haplotypes_gzfile ${chromosome}:${start}-${stop} | awk -v col1=$col1 -v col2=$col2 '{print $1,$2,$col1,$col2}' >> ${ind_n}.estimate.vcf
-done < <(awk 'NR > 1 {print}' ${ind_n}.wide.haps)
-gzip ${ind_n}.estimate.vcf
-
-
-
+    tabix $haplotypes_gzfile ${chromosomeN}:${start}-${stop} | awk -v col1=$col1 -v col2=$col2 '{print $1,$2,$col1,$col2}' >> ${individual_n}.vcf
+    fi
+done < <(awk 'NR > 1 {print}' ${individual_n}.wide.haps)
+# remove inside 'if' block to instead do all chromosomes
 
 # vcf to personalized fasta
-# personalized fasta to .fastq
-# .fastq to mapped .bam
+module load python/3.6.8
+
+python -  <<EOF
+
+import copy
+
+ind_n = "${individual_n}"
+chromosome = "${chromosome}"
+input_fasta = "../../input_data/" + chromosome + ".fa"
+input_genotypes = ind_n + ".vcf"
+vcf_sites = "../../input_data/" + chromosome + ".sites"
+
+ref_allele = "0/0"
+alt_allele = "1/1"
+missing_data = "./."
+
+print(ind_n, chromosome, input_fasta)
+
+with open(input_fasta, 'r') as infile:
+  fasta = infile.read().splitlines()
+  haplotype1 = list(''.join(fasta[1:]))
+
+haplotype2 = haplotype1.copy()
+
+# Create dictionary for this chromosome
+sites = {}
+with open(vcf_sites, 'r') as infile:
+  for line in infile:
+    chromosome, pos, ref, alt = line.rstrip().split()
+    sites[int(pos)] = [ref,alt]
+
+with open(input_genotypes, 'r') as infile:
+  for line in infile:
+    chrom, pos, hap1, hap2 = line.split()
+    if chrom == chromosome:
+      pos = int(pos)
+      if hap1 == alt_allele:
+        haplotype1[pos+1] = sites[pos][1]
+      elif hap1 == missing_data:
+        haplotype1[pos+1] = "N"
+      if hap2 == alt_allele:
+        haplotype2[pos+1] = sites[pos][1]
+      elif hap2 == missing_data:
+        haplotype2[pos+1] = "N"
+
+with open(ind_n + "." + chromosome + ".fasta", 'w') as outfile:
+  outfile.write(">" + ind_n + "_" + chromosome + "_haplotype1" "\n")
+  outfile.write('\n'.join([''.join(haplotype1[i:i+50]) for i in range(0,len(haplotype1),50)]))
+  outfile.write(">" + ind_n + "_" + chromosome + "_haplotype2" "\n")
+  outfile.write('\n'.join([''.join(haplotype2[i:i+50]) for i in range(0,len(haplotype2),50)]))
+
+EOF
+
+
+diploidGenomeSize=$(grep "^[^>]" ${individual_n}.${chromosome}.fasta | wc -c)
+
+function getNReads {
+# getNReads $readLength $coverage $diploidGenomeSize
+Rscript - <<-EOF
+    readLength <- as.numeric($1)
+    coverage <- as.numeric($2)
+    genomeSize <- as.numeric($3)/2
+    nReads = round(genomeSize * coverage / (2*readLength)) # paired end
+    cat(nReads)
+EOF
+}
+
+export -f getNReads
+
+nReads=$(getNReads $readLength $coverage $diploidGenomeSize)
+
+# From personalized fasta to fastq files with wgsim
+        echo generating reads with wgsim
+../../bin/wgsim-master/wgsim \
+  -1 $readLength \
+  -2 $readLength \
+  -N $nReads \
+  -e 0.001 \
+  -r 0 \
+  -R 0 \
+  ${individual_n}.${chromosome}.fasta \
+  ${individual_n}.${chromosome}.F.fq \
+  ${individual_n}.${chromosome}.R.fq && \
+  rm ${individual_n}.${chromosome}.fasta && \
+  bzip2 ${individual_n}.${chromosome}.F.fq && \
+  bzip2 ${individual_n}.${chromosome}.R.fq
+
+exit 0
