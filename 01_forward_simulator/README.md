@@ -54,3 +54,10 @@ Rscript forward_simulator.Rscript \
 
 EOF
 ```
+
+Note: Removed the 'iteration' portion of filenames, e.g.
+```
+for file in*.haps; do mv ${file} ${file%_1.haps}.haps; done
+for file in*.founders; do mv ${file} ${file%_1.founders}.founders; done
+```
+such that `hybrid_swarm_32_F1_1.founders` is renamed `hybrid_swarm_32_F1.founders` 

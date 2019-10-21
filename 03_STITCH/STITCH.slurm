@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 #SBATCH -N 1
 #SBATCH --ntasks-per-node=4
-#SBATCH --mem 32G
-#SBATCH -t 0-2:00:00
-#SBATCH -p standard
+#SBATCH --mem 64G
+#SBATCH -t 0-16:00:00
+#SBATCH -p largemem
 #SBATCH --account berglandlab
 
 module load gcc
@@ -17,6 +17,7 @@ N=${SLURM_ARRAY_TASK_ID}
 population_name=${1}
 #population_name="hybrid_swarm_32_F5"
 population_size=${population_sizes[$N]}
+n_generations=$(echo $population_name | cut -d "_" -f 4 | cut -d "F" -f 2)
 
 # Create iteration folder
 mkdir -p ${population_name}_${population_size} && cd ${population_name}_${population_size}
@@ -45,5 +46,5 @@ posfile="../../input_data/2L.sites"
 --bamlist=bamlist.txt \
 --K=32 \
 --nCores=4 \
---nGen=5
+--nGen=${n_generations}
 # --switchModelIteration=39 \

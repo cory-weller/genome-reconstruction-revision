@@ -13,4 +13,4 @@ tiny/*
 *.bam
 *.bai
 03_STITCH/STITCH/
-03_STITCH/hybrid_swarm_32_F5_25/
+02_simulate_reads/hybrid_swarm*

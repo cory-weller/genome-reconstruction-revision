@@ -1,5 +1,12 @@
-# genome-reconstruction-revision
+# 03_STITCH
 
-## Preparing data
+## Installation
+Install `STITCH` using `install_STITCH.sh`
 
-Created necessary `.fasta` reference files (indices, sequence dictionary) using [`prepare_reference.sh`](input_data/prepare_reference.sh)
+## Running STITCH on simulated populations
+The `STITCH.slurm` script, submitted with `submit_STITCH.sh`, is ran as a job array for each of the simulated populations.
+
+## Calculating STITCH accuracy
+The `submit_calculate_STITCH_accuracy.sh` script submits `calculate_STITCH_accuracy.slurm` for simulated populations. Each job in turn executes `calculate_STITCH_accuracy.R`. The `R` script converts the `.vcf` file from `STITCH` into `.gds` format, and compares the estimated genotypes to the true (simulated) genotypes. A `data.table` of accuracy stats is saved as an `.RDS` object.
+
+## Visualizing STITCH accuracy

@@ -29,6 +29,21 @@ bash splitFasta.sh dgrp2.reference.fasta
 # prepare {chromosome}.sites files
 zcat haplotypes.vcf.gz | awk -F "\t" 'BEGIN{OFS="\t";} $1 !~ /^#/ {s=$1".sites"; print $1,$2,$4,$5 > s}'
 
+# prepare heterozygous VCF file for 2L (for ASEReadCounter)
+awk -F "\t"  '
+BEGIN{OFS="\t";}
+{
+if ($1 ~ /^##/)
+	print $0;
+else if ($1 ~ /^#CHROM/)
+	print $1,$2,$3,$4,$5,$6,$7,$8,$9,"HET";
+else if ($1 ~ /^2L/)
+	print $1,$2,$3,$4,$5,$6,$7,$8,$9,"0/1";
+}' <(zcat haplotypes.vcf.gz) > variants_het_2L.vcf 
+
+module load gatk
+gatk IndexFeatureFile --feature-file variants_het_2L.vcf
+
 # Create Rsubread Index
 sbatch <<EOF
 #!/usr/bin/env bash

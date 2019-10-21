@@ -2,7 +2,7 @@
 #SBATCH -N 1
 #SBATCH --ntasks-per-node=1
 #SBATCH --mem 8G
-#SBATCH -t 0-0:02:00
+#SBATCH -t 0-12:00:00
 #SBATCH -p standard
 #SBATCH --account berglandlab
 
@@ -135,7 +135,7 @@ with open(input_fasta, 'r') as infile:
   fasta = infile.read().splitlines()
   haplotype1 = list(''.join(fasta[1:]))
 
-haplotype2 = haplotype1.copy()
+haplotype2 = haplotype1[:]
 
 # Create dictionary for this chromosome
 sites = {}
@@ -161,6 +161,7 @@ with open(input_genotypes, 'r') as infile:
 with open(ind_n + "." + chromosome + ".fasta", 'w') as outfile:
   outfile.write(">" + ind_n + "_" + chromosome + "_haplotype1" "\n")
   outfile.write('\n'.join([''.join(haplotype1[i:i+50]) for i in range(0,len(haplotype1),50)]))
+  outfile.write('\n')
   outfile.write(">" + ind_n + "_" + chromosome + "_haplotype2" "\n")
   outfile.write('\n'.join([''.join(haplotype2[i:i+50]) for i in range(0,len(haplotype2),50)]))
 
